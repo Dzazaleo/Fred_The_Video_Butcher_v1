@@ -3,8 +3,9 @@ import { VideoDropZone } from './components/VideoDropZone';
 import { VideoPreview } from './components/VideoPreview';
 import { ProcessingOverlay } from './components/ProcessingOverlay';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
-import { Button } from './components/Button'; // Ensure this export exists
-import { VideoAsset } from './types';
+import { ReferenceUploader } from './components/ReferenceUploader';
+import { Button } from './components/Button';
+import { VideoAsset, ReferenceAsset } from './types';
 import { Clapperboard } from 'lucide-react';
 
 // Services
@@ -15,6 +16,7 @@ type AppState = 'IDLE' | 'PREVIEW' | 'PROCESSING' | 'REVIEW';
 
 const App: React.FC = () => {
   const [activeAsset, setActiveAsset] = useState<VideoAsset | null>(null);
+  const [referenceAsset, setReferenceAsset] = useState<ReferenceAsset | null>(null);
   const [appState, setAppState] = useState<AppState>('IDLE');
   
   // Processing State
@@ -38,6 +40,15 @@ const App: React.FC = () => {
     };
   }, [activeAsset]);
 
+  useEffect(() => {
+    return () => {
+      if (referenceAsset?.previewUrl) {
+        URL.revokeObjectURL(referenceAsset.previewUrl);
+        console.log(`[Memory] Revoked Ref URL: ${referenceAsset.previewUrl}`);
+      }
+    };
+  }, [referenceAsset]);
+
   const handleFileSelected = useCallback((file: File, url: string) => {
     if (activeAsset) URL.revokeObjectURL(activeAsset.previewUrl);
     setActiveAsset({ file, previewUrl: url });
@@ -51,7 +62,10 @@ const App: React.FC = () => {
   }, []);
 
   const handleStartProcessing = async () => {
-    if (!activeAsset) return;
+    if (!activeAsset || !referenceAsset) {
+      alert("Please upload both a video and a reference image.");
+      return;
+    }
     
     setAppState('PROCESSING');
     
@@ -59,23 +73,19 @@ const App: React.FC = () => {
       const vision = VisionProcessor.getInstance();
       
       // 1. Run Vision Analysis
-      const rawDetections = await vision.analyzeVideo(activeAsset, (p) => {
-        setProgress(p);
-      });
+      const rawDetections = await vision.analyzeVideo(
+        activeAsset, 
+        referenceAsset.previewUrl,
+        (p) => {
+          setProgress(p);
+        }
+      );
 
       // 2. Run Timeline Logic
-      // Note: We need the video duration. The VisionProcessor knows it, 
-      // but simpler to grab it from the progress or video element. 
-      // For this implementation, we use the progress total duration approx.
-      const estimatedDuration = progress.totalFrames > 0 
-        ? (progress.totalFrames / 30) // Fallback if needed, but analyzeVideo loop handles time accurately
-        : rawDetections[rawDetections.length - 1]?.timestamp || 0; 
-        
-      // Better approach: Retrieve duration from the video element used in preview 
-      // (Simplified for this snippet, assumes TimelineManager can handle the math)
-       const videoElement = document.createElement('video');
-       videoElement.src = activeAsset.previewUrl;
-       await new Promise<void>(r => { videoElement.onloadedmetadata = () => r(); });
+      // Retrieve duration from the video element
+      const videoElement = document.createElement('video');
+      videoElement.src = activeAsset.previewUrl;
+      await new Promise<void>(r => { videoElement.onloadedmetadata = () => r(); });
       
       const results = TimelineManager.processDetections(rawDetections, videoElement.duration);
       
@@ -114,7 +124,7 @@ const App: React.FC = () => {
         {/* State: Processing Overlay */}
         {appState === 'PROCESSING' && (
           <ProcessingOverlay 
-            progress={(progress.processedFrames / progress.totalFrames) * 100}
+            progress={progress.totalFrames > 0 ? (progress.processedFrames / progress.totalFrames) * 100 : 0}
             fps={progress.fps}
             currentFrame={progress.processedFrames}
             totalFrames={progress.totalFrames}
@@ -130,7 +140,7 @@ const App: React.FC = () => {
             </h2>
             <p className="text-slate-500 text-lg">
               {appState === 'REVIEW' ? 'Confirm the detected interruptions below.' :
-               appState === 'PREVIEW' ? 'Ready to analyze for debug menus.' :
+               appState === 'PREVIEW' ? 'Configure detection settings.' :
                'Upload raw gameplay to begin automated cleanup.'}
             </p>
           </div>
@@ -145,8 +155,26 @@ const App: React.FC = () => {
             {appState === 'PREVIEW' && activeAsset && (
               <div className="space-y-6">
                 <VideoPreview asset={activeAsset} onRemove={handleRemoveVideo} />
-                <div className="flex justify-center">
-                   <Button onClick={handleStartProcessing} className="w-full max-w-xs shadow-lg shadow-blue-600/20 py-3 text-lg">
+                
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                  <h3 className="font-semibold text-slate-900">Detection Fingerprint</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+                    <div className="text-sm text-slate-500">
+                      Upload a screenshot of the specific menu, loading screen, or UI element you want to automatically remove from the footage.
+                    </div>
+                    <ReferenceUploader 
+                      imageSrc={referenceAsset?.previewUrl || null}
+                      onImageSelected={(file, url) => setReferenceAsset({ file, previewUrl: url })}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-center pt-2">
+                   <Button 
+                    onClick={handleStartProcessing} 
+                    disabled={!referenceAsset}
+                    className="w-full max-w-xs shadow-lg shadow-blue-600/20 py-3 text-lg disabled:opacity-50 disabled:shadow-none"
+                   >
                      Process Footage
                    </Button>
                 </div>
