@@ -19,21 +19,21 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({ asset, onRemove }) =
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+            <div className="p-2 bg-blue-900/30 text-blue-400 rounded-lg">
               <FileVideo size={20} />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-slate-900 truncate max-w-[200px] sm:max-w-md">
+              <h3 className="text-sm font-semibold text-slate-200 truncate max-w-[200px] sm:max-w-md">
                 {asset.file.name}
               </h3>
               <p className="text-xs text-slate-500">{formatSize(asset.file.size)}</p>
             </div>
           </div>
-          <Button variant="ghost" onClick={onRemove} className="!p-2 text-slate-400 hover:text-red-500 hover:bg-red-50">
+          <Button variant="ghost" onClick={onRemove} className="!p-2 text-slate-500 hover:text-red-400 hover:bg-slate-800">
             <X size={20} />
           </Button>
         </div>
